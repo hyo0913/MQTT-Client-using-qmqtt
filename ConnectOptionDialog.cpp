@@ -104,9 +104,9 @@ void ConnectOptionDialog::setEditable(bool editable)
     ui->spinBoxWillQoS->setEnabled(editable);
     ui->checkBoxWillRetain->setEnabled(editable);
     ui->checkBoxUserNameFlag->setEnabled(editable);
-    ui->lineEditUserName->setReadOnly(!editable);
+    ui->lineEditUserName->setEnabled(editable);
     ui->checkBoxPasswordFlag->setEnabled(editable);
-    ui->lineEditPassword->setReadOnly(!editable);
+    ui->lineEditPassword->setEnabled(editable);
     ui->labelKeepAlive->setEnabled(editable);
     ui->spinBoxKeepAlive->setEnabled(editable);
     ui->labelKeepAliveSec->setEnabled(editable);
