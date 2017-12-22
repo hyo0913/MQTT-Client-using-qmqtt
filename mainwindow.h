@@ -38,15 +38,15 @@ private:
 
 private slots:
     // MQTT CLIENT
-    void connected();
-    void disconnected();
-    void error(const QMQTT::ClientError error);
+    void mqttConnected();
+    void mqttDisconnected();
+    void mqttError(const QMQTT::ClientError error);
 
-    void subscribed(const QString &topic, quint8 qos);
-    void unsubscribed(const QString &topic);
-    void published(const QMQTT::Message &message, quint16 msgId);
-    void received(const QMQTT::Message &message);
-    void pingResp();
+    void mqttSubscribed(const QString &topic, quint8 qos);
+    void mqttUnsubscribed(const QString &topic);
+    void mqttPublished(const QMQTT::Message &message, quint16 msgId);
+    void mqttReceived(const QMQTT::Message &message);
+    void mqttPingResp();
 
     // UI
     void btnConnectClicked();
