@@ -1,4 +1,4 @@
-# MQTT-Client-with-QMQTT
+# MQTT-Client-using-QMQTT
 
 This is a simple MQTT client program using qmqtt and just my practice project.
 
