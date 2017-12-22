@@ -15,15 +15,15 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 
     // MQTT CLIENT
-    connect(m_client, SIGNAL(connected()), this, SLOT(connected()));
-    connect(m_client, SIGNAL(disconnected()), this, SLOT(disconnected()));
-    connect(m_client, SIGNAL(error(QMQTT::ClientError)), this, SLOT(error(QMQTT::ClientError)));
+    connect(m_client, SIGNAL(connected()), this, SLOT(mqttConnected()));
+    connect(m_client, SIGNAL(disconnected()), this, SLOT(mqttDisconnected()));
+    connect(m_client, SIGNAL(error(QMQTT::ClientError)), this, SLOT(mqttError(QMQTT::ClientError)));
 
-    connect(m_client, SIGNAL(subscribed(QString,quint8)), this, SLOT(subscribed(QString,quint8)));
-    connect(m_client, SIGNAL(unsubscribed(QString)), this, SLOT(unsubscribed(QString)));
-    connect(m_client, SIGNAL(published(QMQTT::Message,quint16)), this, SLOT(published(QMQTT::Message,quint16)));
-    connect(m_client, SIGNAL(received(QMQTT::Message)), this, SLOT(received(QMQTT::Message)));
-    connect(m_client, SIGNAL(pingresp()), this, SLOT(pingResp()));
+    connect(m_client, SIGNAL(subscribed(QString,quint8)), this, SLOT(mqttSubscribed(QString,quint8)));
+    connect(m_client, SIGNAL(unsubscribed(QString)), this, SLOT(mqttUnsubscribed(QString)));
+    connect(m_client, SIGNAL(published(QMQTT::Message,quint16)), this, SLOT(mqttPublished(QMQTT::Message,quint16)));
+    connect(m_client, SIGNAL(received(QMQTT::Message)), this, SLOT(mqttReceived(QMQTT::Message)));
+    connect(m_client, SIGNAL(pingresp()), this, SLOT(mqttPingResp()));
 
     // UI
     connect(ui->pushButtonConnect, SIGNAL(clicked(bool)), this, SLOT(btnConnectClicked()));
@@ -120,7 +120,7 @@ bool MainWindow::checkTopic(const QString &myTopic, const QString &recvTopic) co
     return result;
 }
 
-void MainWindow::connected()
+void MainWindow::mqttConnected()
 {
     m_connectOptionDialog->setEditable(false);
 
@@ -136,7 +136,7 @@ void MainWindow::connected()
     appendLog("Connected", m_client->host().toString());
 }
 
-void MainWindow::disconnected()
+void MainWindow::mqttDisconnected()
 {
     m_msgId = 0;
     m_lastPubTopic.clear();
@@ -160,7 +160,7 @@ void MainWindow::disconnected()
     clearSubPrintWidgets();
 }
 
-void MainWindow::error(const QMQTT::ClientError error)
+void MainWindow::mqttError(const QMQTT::ClientError error)
 {
     QString errorDetail;
     switch(error)
@@ -194,7 +194,7 @@ void MainWindow::error(const QMQTT::ClientError error)
     appendLog("ERROR", errorDetail);
 }
 
-void MainWindow::subscribed(const QString &topic, quint8 qos)
+void MainWindow::mqttSubscribed(const QString &topic, quint8 qos)
 {
     QString text = QString("%1 (Qos:%2)").arg(topic).arg(qos);
     appendLog("Subscribed", text);
@@ -207,7 +207,7 @@ void MainWindow::subscribed(const QString &topic, quint8 qos)
     }
 }
 
-void MainWindow::unsubscribed(const QString &topic)
+void MainWindow::mqttUnsubscribed(const QString &topic)
 {
     appendLog("Unsubscribed", topic);
 
@@ -218,7 +218,7 @@ void MainWindow::unsubscribed(const QString &topic)
     }
 }
 
-void MainWindow::published(const QMQTT::Message &message, quint16 msgId)
+void MainWindow::mqttPublished(const QMQTT::Message &message, quint16 msgId)
 {
     m_publishCompleted = true;
 
@@ -232,7 +232,7 @@ void MainWindow::published(const QMQTT::Message &message, quint16 msgId)
     appendLog("Published", text);
 }
 
-void MainWindow::received(const QMQTT::Message &message)
+void MainWindow::mqttReceived(const QMQTT::Message &message)
 {
     if( message.qos() > 0 )
     {
@@ -262,7 +262,7 @@ void MainWindow::received(const QMQTT::Message &message)
     }
 }
 
-void MainWindow::pingResp()
+void MainWindow::mqttPingResp()
 {
     ui->textEditLog->append("PING RESP");
 }
