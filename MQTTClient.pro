@@ -7,13 +7,13 @@ TEMPLATE = app
 
 HEADERS  += mainwindow.h \
         ConnectOptionDialog.h \
-        SubscribePrintForm.h
+        SubscribePrintForm.h \
 
 SOURCES += main.cpp\
         mainwindow.cpp \
         ConnectOptionDialog.cpp \
-        SubscribePrintForm.cpp
+        SubscribePrintForm.cpp \
 
 FORMS    += mainwindow.ui \
         ConnectOptionDialog.ui \
-        SubscribePrintForm.ui
+        SubscribePrintForm.ui \

@@ -31,6 +31,7 @@ private:
     QSplitter* m_subSplitter;
     QHash<QString, SubscribePrintForm*> m_subPrintWidgets;
 
+    void initClient();
     void appendLog(const QString &logName, const QString &logText);
 
     void clearSubPrintWidgets();

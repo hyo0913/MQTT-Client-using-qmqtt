@@ -2,6 +2,8 @@
 #include "ui_mainwindow.h"
 
 #include "QUuid"
+#include "QHostInfo"
+#include "QSslKey"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -13,17 +15,6 @@ MainWindow::MainWindow(QWidget *parent) :
     m_subSplitter(new QSplitter(Qt::Horizontal))
 {
     ui->setupUi(this);
-
-    // MQTT CLIENT
-    connect(m_client, SIGNAL(connected()), this, SLOT(mqttConnected()));
-    connect(m_client, SIGNAL(disconnected()), this, SLOT(mqttDisconnected()));
-    connect(m_client, SIGNAL(error(QMQTT::ClientError)), this, SLOT(mqttError(QMQTT::ClientError)));
-
-    connect(m_client, SIGNAL(subscribed(QString,quint8)), this, SLOT(mqttSubscribed(QString,quint8)));
-    connect(m_client, SIGNAL(unsubscribed(QString)), this, SLOT(mqttUnsubscribed(QString)));
-    connect(m_client, SIGNAL(published(QMQTT::Message,quint16)), this, SLOT(mqttPublished(QMQTT::Message,quint16)));
-    connect(m_client, SIGNAL(received(QMQTT::Message)), this, SLOT(mqttReceived(QMQTT::Message)));
-    connect(m_client, SIGNAL(pingresp()), this, SLOT(mqttPingResp()));
 
     // UI
     connect(ui->pushButtonConnect, SIGNAL(clicked(bool)), this, SLOT(btnConnectClicked()));
@@ -44,13 +35,29 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
-    if( m_client->isConnectedToHost() )
+    if( m_client != NULL )
     {
-        m_client->disconnectFromHost();
+        if( m_client->isConnectedToHost() )
+        {
+            m_client->disconnectFromHost();
+        }
+        delete m_client;
     }
-    delete m_client;
     clearSubPrintWidgets();
     delete ui;
+}
+
+void MainWindow::initClient()
+{
+    connect(m_client, SIGNAL(connected()), this, SLOT(mqttConnected()));
+    connect(m_client, SIGNAL(disconnected()), this, SLOT(mqttDisconnected()));
+    connect(m_client, SIGNAL(error(QMQTT::ClientError)), this, SLOT(mqttError(QMQTT::ClientError)));
+
+    connect(m_client, SIGNAL(subscribed(QString,quint8)), this, SLOT(mqttSubscribed(QString,quint8)));
+    connect(m_client, SIGNAL(unsubscribed(QString)), this, SLOT(mqttUnsubscribed(QString)));
+    connect(m_client, SIGNAL(published(QMQTT::Message,quint16)), this, SLOT(mqttPublished(QMQTT::Message,quint16)));
+    connect(m_client, SIGNAL(received(QMQTT::Message)), this, SLOT(mqttReceived(QMQTT::Message)));
+    connect(m_client, SIGNAL(pingresp()), this, SLOT(mqttPingResp()));
 }
 
 void MainWindow::appendLog(const QString &logName, const QString &logText)
@@ -109,10 +116,9 @@ bool MainWindow::checkTopic(const QString &myTopic, const QString &recvTopic) co
         }
     }
 
-    if(     (result == true)
-            && ((singleLevel == true) || ((singleLevel == false) && (multiLevel == false)))
-            && (lstMyTopic.count() != lstRecvTopic.count())
-            )
+    if( (result == true) &&
+        ((singleLevel == true) || ((singleLevel == false) && (multiLevel == false))) &&
+        (lstMyTopic.count() != lstRecvTopic.count()) )
     {
         result = false;
     }
@@ -133,7 +139,7 @@ void MainWindow::mqttConnected()
     ui->pushButtonSubscribe->setEnabled(true);
     ui->pushButtonUnsubscribe->setEnabled(true);
 
-    appendLog("Connected", m_client->host().toString());
+    appendLog("Connected", m_client->hostName());
 }
 
 void MainWindow::mqttDisconnected()
@@ -155,7 +161,7 @@ void MainWindow::mqttDisconnected()
     ui->pushButtonSubscribe->setEnabled(false);
     ui->pushButtonUnsubscribe->setEnabled(false);
 
-    appendLog("Disconnected", m_client->host().toString());
+    appendLog("Disconnected", m_client->hostName());
 
     clearSubPrintWidgets();
 }
@@ -269,20 +275,71 @@ void MainWindow::mqttPingResp()
 
 void MainWindow::btnConnectClicked()
 {
-    if( m_client->isConnectedToHost() == false )
+    if( m_client != NULL && m_client->isConnectedToHost() )
     {
-        QHostAddress hostAddress;
-        QString temp = ui->lineEditHostAddress->text();
-        if( temp.isEmpty() || temp.contains("localhost", Qt::CaseInsensitive) )
+        m_client->setAutoReconnect(false);
+        m_client->disconnectFromHost();
+    }
+    else
+    {
+        if( m_client != NULL )
         {
-            hostAddress = QHostAddress(QHostAddress::LocalHost);
-            ui->lineEditHostAddress->setText(QString("localhost:%1").arg(hostAddress.toString()));
-        }
-        else
-        {
-            hostAddress.setAddress(temp);
+            delete m_client;
+            m_client = NULL;
         }
 
+        QString hostAddress = ui->lineEditHostAddress->text();
+        if( hostAddress.isEmpty() )
+        {
+            hostAddress = QHostAddress(QHostAddress::LocalHost).toString();
+        }
+
+        if( m_connectOptionDialog->needWebsocket() == false )   // tcp
+        {
+            if( m_connectOptionDialog->useSsl() == false )  // without security
+            {
+                m_client = new QMQTT::Client();
+                m_client->setHostName(hostAddress);
+                m_client->setPort(m_connectOptionDialog->port());
+            }
+            else    // security
+            {
+                QSslConfiguration sslConfig;
+                QSslCertificate cert = m_connectOptionDialog->certificate();
+                if( cert.isNull() )
+                {
+                    appendLog("Internal Error", "Failed to load the certificate");
+                    return;
+                }
+                QSslKey key = m_connectOptionDialog->privateKey();
+                if( key.isNull() )
+                {
+                    appendLog("Internal Error", "Failed to load the private key");
+                    return;
+                }
+                sslConfig.setLocalCertificate(cert);
+                sslConfig.setPrivateKey(key);
+                m_client = new QMQTT::Client(hostAddress, m_connectOptionDialog->port(), sslConfig, m_connectOptionDialog->ignoreSelfSigned());
+            }
+        }
+        else    // websocket
+        {
+            // ws://broker.hivemq.com:8000/mqtt
+            // "ws://"              : websocket
+            // "broker.hivemq.com"  : host address
+            // ":8000"              : port 8000
+            // "/mqtt"              : request URI mqtt
+
+            hostAddress.prepend("ws://");
+            hostAddress.append(QString(":%1/mqtt").arg(m_connectOptionDialog->port()));
+            m_client = new QMQTT::Client(hostAddress,
+                                         QString("http://%1").arg(QHostInfo::localHostName()),
+                                         QWebSocketProtocol::VersionLatest,
+                                         m_connectOptionDialog->ignoreSelfSigned());
+        }
+        initClient();
+
+        // common options
         // clean session flag, will flags
         m_client->setCleanSession(m_connectOptionDialog->cleanSession());   // cleanSession flag
         if( m_connectOptionDialog->willFlag() ) // will flag
@@ -339,19 +396,11 @@ void MainWindow::btnConnectClicked()
             m_client->setAutoReconnect(false);
         }
 
-        m_client->setHost(hostAddress);
-        m_client->setPort(ui->spinBoxPort->value());
         m_client->setClientId(ui->lineEditClientId->text());
         m_client->setKeepAlive(m_connectOptionDialog->keepAlive());
 
-        appendLog("Connect", hostAddress.toString());
-
+        appendLog("Connecting", hostAddress);
         m_client->connectToHost();
-    }
-    else
-    {
-        m_client->setAutoReconnect(false);
-        m_client->disconnectFromHost();
     }
 }
 
@@ -373,7 +422,7 @@ void MainWindow::btnUnsubscribeClicked()
 
 void MainWindow::btnPublishClicked()
 {
-    //QMQTT::Message message(m_msgId, ui->lineEditTopic->text(), ui->lineEditPayload->text().toUtf8());
+    // QMQTT::Message message(m_msgId, ui->lineEditTopic->text(), ui->lineEditPayload->text().toUtf8());
     // QMQTT::Message에 어떤 파라미터 들이 set 되는지 이해를 돕기위해 생성자에 파라미터를 넘기지 않고 아래 처럼 각각 함수들을 호출했다.
     // 이해했다면 나중엔 편한대로 코딩해라.
 
